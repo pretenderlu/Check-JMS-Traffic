@@ -13,7 +13,8 @@ from datetime import datetime
 
 # 从青龙环境变量中获取配置信息  
 JMS_API_URL = os.environ.get('JMS_API_URL', '')  
-SERVER_CHAN_KEY = os.environ.get('SERVER_CHAN_KEY', '')  
+SC_UID = os.environ.get('SC_UID', '')  
+SC_SENDKEY = os.environ.get('SC_SENDKEY', '')  
 TG_BOT_TOKEN = os.environ.get('TG_BOT_TOKEN', '')  
 TG_USER_ID = os.environ.get('TG_USER_ID', '')  
 
@@ -31,27 +32,45 @@ def check_traffic():
         print(f"请求发生错误: {str(e)}")  
         return None  
 
-def send_server_chan(title, desp):  
-    """通过Server酱发送通知"""  
-    if not SERVER_CHAN_KEY:  
-        print("未设置SERVER_CHAN_KEY，跳过Server酱通知")  
+def send_server_chan3(title, content, tags=None, short=None):  
+    """通过Server酱3发送通知"""  
+    if not SC_UID or not SC_SENDKEY:  
+        print("未设置SC_UID或SC_SENDKEY，跳过Server酱通知")  
         return False  
         
     try:  
-        server_url = f"https://sctapi.ftqq.com/{SERVER_CHAN_KEY}.send"  
+        # Server酱3 API URL  
+        server_url = f"https://{SC_UID}.push.ft07.com/send/{SC_SENDKEY}.send"  
+        
+        # 准备发送的数据  
         params = {  
-            'title': title,  
-            'desp': desp  
+            'title': title,      # 推送标题  
+            'desp': content      # 推送内容，支持markdown  
         }  
+        
+        # 如果有标签和简短描述，添加到参数中  
+        if tags:  
+            params['tags'] = tags  
+        if short:  
+            params['short'] = short  
+        
+        # 发送POST请求  
         response = requests.post(server_url, data=params)  
+        
+        # 检查响应  
         if response.status_code == 200:  
-            print("Server酱通知发送成功")  
-            return True  
+            response_json = response.json()  
+            if response_json.get('code') == 0:  
+                print("Server酱3通知发送成功")  
+                return True  
+            else:  
+                print(f"Server酱3通知发送失败: {response_json.get('message')}")  
+                return False  
         else:  
-            print(f"Server酱通知发送失败: {response.text}")  
+            print(f"Server酱3通知发送失败，状态码: {response.status_code}")  
             return False  
     except Exception as e:  
-        print(f"Server酱通知发送错误: {str(e)}")  
+        print(f"Server酱3通知发送错误: {str(e)}")  
         return False  
 
 def send_telegram(message):  
@@ -146,22 +165,30 @@ def main():
 - 检查时间: {today.strftime('%Y-%m-%d %H:%M:%S')}  
             """  
             
-            # 根据使用比例设置不同的通知标题  
+            # 为Server酱3创建简短描述  
+            short_message = f"已用:{used_gb}GB/{monthly_limit_gb}GB ({percentage:.2f}%), 重置:{days_until_reset}天后"  
+            
+            # 根据使用比例设置不同的通知标题和标签  
+            tags = "信息"  
             if percentage > 80:  
                 message_title = "⚠️ JMS流量使用超过80%，请注意"  
+                tags = "警告"  
             if percentage > 95:  
                 message_title = "🚨 JMS流量使用超过95%，请立即处理"  
+                tags = "紧急"  
                 
         except Exception as e:  
             message_title = "JMS流量数据处理错误"  
             message_content = f"在处理返回的流量数据时出错: {str(e)}\n原始数据: {json.dumps(data)}"  
+            short_message = "流量数据处理出错"  
+            tags = "错误"  
     
     # 输出结果  
     print(message_title)  
     print(message_content)  
     
     # 发送通知  
-    send_server_chan(message_title, message_content)  
+    send_server_chan3(message_title, message_content, tags=tags, short=short_message)  
     send_telegram(f"*{message_title}*\n\n{message_content}")  
 
 if __name__ == "__main__":  
