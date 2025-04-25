@@ -12,7 +12,7 @@
 - 📊 计算已用流量、剩余流量及使用百分比
 - 💵 查询DeepSeek账户余额和充值情况
 - 📅 显示流量重置日期及剩余天数
-- 📱 支持多种通知方式（Server酱3、Telegram）
+- 📱 支持多种通知方式（Server酱³、Telegram）
 - ⚠️ 当流量使用超过阈值时发出警告
 - 🕒 可设置定时自动检查
 
@@ -33,8 +33,8 @@
 | 变量名 | 必填 | 说明 |
 |-------|------|------|
 | `JMS_API_URL` | 是 | JMS API的URL地址 |
-| `SC_UID` | 否 | Server酱3的UID |
-| `SC_SENDKEY` | 否 | Server酱3的SendKey |
+| `SC_UID` | 否 | Server酱³的UID |
+| `SC_SENDKEY` | 否 | Server酱³的SendKey |
 | `TG_BOT_TOKEN` | 否 | Telegram机器人Token |
 | `TG_USER_ID` | 否 | Telegram用户ID |
 | `DEEPSEEK_API_KEY` | 否 | DeepSeek的API密钥 |
