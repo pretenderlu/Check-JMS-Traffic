@@ -69,9 +69,9 @@ def get_deepseek_balance():
         return None  
 
 def send_server_chan3(title, content, tags=None, short=None):  
-    """Server酱³发送通知"""  
+    """通过Server酱³发送通知"""  
     if not SC_UID or not SC_SENDKEY:  
-        print("未设置SC_UID或SC_SENDKEY，跳过Server酱通知")  
+        print("未设置SC_UID或SC_SENDKEY，跳过Server酱³通知")  
         return False  
         
     try:  
@@ -138,24 +138,23 @@ def bytes_to_gb(bytes_value):
     return round(bytes_value / (1024 ** 3), 2)  
 
 def main():  
-    print("开始检查项目使用情况...")  
+    print("开始检查JMS流量使用情况...")  
     
     # 检查配置  
     if not JMS_API_URL:  
         print("错误: 未设置JMS_API_URL环境变量")  
         return  
     
+    # 初始化消息内容  
+    final_message_content = ""  
+    
     # 查询流量  
-    data = check_traffic()  
-    if not data:  
-        message_title = "JMS流量检查失败"  
-        message_content = "无法获取JMS流量数据，请检查API地址是否正确。"  
-    else:  
-        # 根据实际API返回的字段进行处理  
+    traffic_data = check_traffic()  
+    if traffic_data:  
         try:  
-            monthly_limit_bytes = data.get('monthly_bw_limit_b', 0)  
-            used_bytes = data.get('bw_counter_b', 0)  
-            reset_day = data.get('bw_reset_day_of_month', 1)  
+            monthly_limit_bytes = traffic_data.get('monthly_bw_limit_b', 0)  
+            used_bytes = traffic_data.get('bw_counter_b', 0)  
+            reset_day = traffic_data.get('bw_reset_day_of_month', 1)  
             
             # 转换为GB以便于阅读  
             monthly_limit_gb = bytes_to_gb(monthly_limit_bytes)  
@@ -166,49 +165,56 @@ def main():
             today = datetime.now()  
             
             # 计算下次重置日期  
-            reset_date = today.replace(day=reset_day) if today.day < reset_day else today.replace(month=today.month % 12 + 1, day=reset_day)  
+            next_reset_date = today.replace(day=reset_day) if today.day < reset_day else today.replace(month=today.month % 12 + 1, day=reset_day)  
             
-            message_title = "流量与余额监控报告"  
-            message_content = f"""  
+            traffic_message = f"""  
 ## JMS流量使用情况  
 - 已使用流量: **{used_gb} GB**  
 - 总流量限制: **{monthly_limit_gb} GB**  
 - 剩余流量: **{remaining_gb} GB**  
-- 下次重置日: **{reset_date.strftime('%Y-%m-%d')}**  
+- 下次重置日: **{next_reset_date.strftime('%Y-%m-%d')}**  
 - 检查时间: **{today.strftime('%Y-%m-%d %H:%M:%S')}**  
             """  
-            
-            # 检查DeepSeek余额  
-            deepseek_balance_info = get_deepseek_balance()  
-            if deepseek_balance_info is not None:  
-                total_balance = deepseek_balance_info['total_balance']  
-                granted_balance = deepseek_balance_info['granted_balance']  
-                topped_up_balance = deepseek_balance_info['topped_up_balance']  
-                message_content += f"""  
+            print("流量检查成功:")  
+            print(traffic_message)  
+            final_message_content += traffic_message  
+        except Exception as e:  
+            print(f"处理流量数据时发生错误: {str(e)}")  
+            final_message_content += "流量数据处理出错。\n"  
+
+    else:  
+        print("无法获取JMS流量数据。")  
+        final_message_content += "无法获取JMS流量数据。\n"  
+
+    # 查询DeepSeek余额  
+    deepseek_balance_info = get_deepseek_balance()  
+    if deepseek_balance_info:  
+        try:  
+            total_balance = deepseek_balance_info['total_balance']  
+            granted_balance = deepseek_balance_info['granted_balance']  
+            topped_up_balance = deepseek_balance_info['topped_up_balance']  
+            balance_message = f"""  
 ## DeepSeek账户余额  
 - 账户总余额: **{total_balance} CNY**  
 - 授予余额: **{granted_balance} CNY**  
 - 充值余额: **{topped_up_balance} CNY**  
-                """  
-
-            # 根据流量使用情况设置通知标题  
-            percentage = (used_bytes / monthly_limit_bytes * 100) if monthly_limit_bytes > 0 else 0  
-            if percentage > 80:  
-                message_title = "⚠️ 流量使用超过80%，请注意"  
-            elif percentage > 95:  
-                message_title = "🚨 流量使用超过95%，请立即处理"  
-
+            """  
+            print("余额检查成功:")  
+            print(balance_message)  
+            final_message_content += balance_message  
         except Exception as e:  
-            message_title = "流量数据处理错误"  
-            message_content = f"在处理返回的流量数据时出错: {str(e)}\n原始数据: {json.dumps(data)}"  
-    
-    # 输出结果  
-    print(message_title)  
-    print(message_content)  
-    
-    # 发送通知  
-    send_server_chan3(message_title, message_content)  
-    send_telegram(f"*{message_title}*\n\n{message_content}")  
+            print(f"处理余额数据时发生错误: {str(e)}")  
+            final_message_content += "余额数据处理出错。\n"  
+    else:  
+        print("无法获取DeepSeek余额数据。")  
+        final_message_content += "无法获取DeepSeek余额数据。\n"  
+
+    # 发送最终通知  
+    if final_message_content:  
+        print("发送通知中...")  
+        title = "流量与余额监控报告"  
+        send_server_chan3(title, final_message_content)  
+        send_telegram(f"*{title}*\n\n{final_message_content}")  
 
 if __name__ == "__main__":  
     main()  
